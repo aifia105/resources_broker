@@ -71,7 +71,10 @@ func (s *TaskService) CreateTask(ctx context.Context, request *model.Task) (*mod
 		return nil, fmt.Errorf("failed to create provisioning task: %w", err)
 	}
 
-	if _, err := s.QueueClient.Enqueue(job); err != nil {
+	if _, err := s.QueueClient.Enqueue(job,
+		asynq.MaxRetry(4),
+		asynq.Timeout(5*time.Minute),
+		asynq.Queue("default")); err != nil {
 		s.DB.Collection(taskCollectionName).DeleteOne(ctx, bson.M{"_id": task.ID})
 		return nil, fmt.Errorf("failed to enqueue provisioning task: %w", err)
 	}
@@ -116,6 +119,27 @@ func (s *TaskService) GetTasks(ctx context.Context, userID string) ([]model.Task
 		return nil, err
 	}
 	return tasks, nil
+}
+
+func (s *TaskService) UpdateTaskStatus(ctx context.Context, taskID string, status model.Status, errorMessage *string) error {
+	taskObjectID, err := bson.ObjectIDFromHex(taskID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidTaskID, err)
+	}
+
+	result, err := s.DB.Collection(taskCollectionName).UpdateOne(ctx,
+		bson.M{"_id": taskObjectID},
+		bson.M{"$set": bson.M{"status": status,
+			"error_message": errorMessage,
+			"updated_at":    time.Now().UTC()}})
+
+	if err != nil {
+		return err
+	}
+	if result.ModifiedCount == 0 {
+		return ErrTaskNotFound
+	}
+	return nil
 }
 
 func taskFilter(userID string, taskID string) (bson.M, error) {
