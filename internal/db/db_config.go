@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -14,11 +13,6 @@ import (
 var DB *mongo.Database
 
 func ConnectDB() {
-
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("No .env file found, database connection cannot be established")
-	}
-
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
 		log.Fatal("MONGODB_URI not set in .env file")
@@ -42,6 +36,6 @@ func ConnectDB() {
 		log.Fatal("Failed to ping MongoDB:", err)
 	}
 
-	DB = client.Database(databaseName)
 	log.Println("Connected to MongoDB successfully")
+	DB = client.Database(databaseName)
 }
